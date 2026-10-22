@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>เครื่องมือสร้าง Parliamentary Diagram</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--tx:#1b1f27;--mut:#667085;--bd:#d8dce3;--ac:#2563eb;--acx:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#13161b;--card:#1d2129;--tx:#eceff4;--mut:#9aa3b2;--bd:#343a46;--ac:#4f8cff;--acx:#fff}}
+:root[data-theme="dark"]{--bg:#13161b;--card:#1d2129;--tx:#eceff4;--mut:#9aa3b2;--bd:#343a46;--ac:#4f8cff;--acx:#fff}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:'Sarabun',system-ui,sans-serif;font-size:16px;line-height:1.5}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 14px 60px}
+h1{font-size:1.6rem;margin:0 0 4px}.sub{color:var(--mut);margin:0 0 18px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:14px}
+.card h2{font-size:1.05rem;margin:0 0 10px}
+input[type=text],input[type=number]{width:100%;padding:9px 11px;border:1px solid var(--bd);border-radius:9px;background:var(--bg);color:var(--tx);font:inherit}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:760px){.cols{grid-template-columns:1fr}}
+.row{display:grid;grid-template-columns:1fr 100px 36px;gap:8px;margin-bottom:8px}
+.hd{color:var(--mut);font-size:.85rem;margin-bottom:6px}
+button{font:inherit;cursor:pointer;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:9px;padding:8px 14px}
+button:hover{border-color:var(--ac)}
+.pri{background:var(--ac);color:var(--acx);border-color:var(--ac);font-weight:600}
+.del{padding:0;color:var(--mut)}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pills button.on{background:var(--ac);color:var(--acx);border-color:var(--ac)}
+.sw{display:inline-flex;gap:2px;margin-right:6px;vertical-align:middle}.sw i{width:10px;height:14px;display:inline-block;border-radius:2px}
+.acts{display:flex;flex-wrap:wrap;gap:10px}
+#out{display:none}
+.cv{overflow-x:auto;border-radius:10px;border:1px solid var(--bd);background:#fff}
+canvas{display:block;width:100%;height:auto;min-width:640px}
+.ana p{margin:0 0 8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>🏛️ Parliamentary Diagram</h1>
+<p class="sub">กรอกข้อมูลที่นั่งของฝ่ายรัฐบาลและฝ่ายค้าน เลือกรูปแบบและโทนสี แล้วกดประมวลผล</p>
+
+<div class="card"><h2>หัวข้อ (ไม่ใส่ก็ได้)</h2>
+<input type="text" id="title" placeholder="เช่น ผลการเลือกตั้ง สส. ปี 2569"></div>
+
+<div class="cols">
+<div class="card"><h2>🟦 ฝ่ายรัฐบาล</h2>
+<div class="hd">ชื่อพรรคการเมือง / จำนวนที่นั่ง</div>
+<div id="gov"></div><button data-add="gov">+ เพิ่มแถว</button></div>
+<div class="card"><h2>🟥 ฝ่ายค้าน</h2>
+<div class="hd">ชื่อพรรคการเมือง / จำนวนที่นั่ง</div>
+<div id="opp"></div><button data-add="opp">+ เพิ่มแถว</button></div>
+</div>
+
+<div class="card"><h2>รูปแบบชาร์ต</h2><div class="pills" id="styles"></div></div>
+<div class="card"><h2>โทนสี</h2><div class="pills" id="pals"></div></div>
+
+<div class="acts" style="margin-bottom:14px">
+<button class="pri" id="go">ประมวลผล</button>
+<button id="dl">⬇ ดาวน์โหลด PNG</button>
+<button id="rs">รีเซ็ตข้อมูล</button>
+</div>
+
+<div id="out">
+<div class="card"><div class="cv"><canvas id="cv"></canvas></div></div>
+<div class="card ana"><h2>📊 บทวิเคราะห์</h2><div id="ana"></div></div>
+</div>
+</div>
+
+<script>
+const STYLES=['ครึ่งวงกลม (จุดที่นั่ง)','โดนัทครึ่งวง','พาย','แท่งแนวนอน','ตารางที่นั่ง (Waffle)'];
+const PALS=[
+ {n:'คลาสสิก',g:['#1d4ed8','#3b82f6','#0ea5e9','#06b6d4','#6366f1','#60a5fa'],o:['#dc2626','#f97316','#ef4444','#f59e0b','#be123c','#fb7185']},
+ {n:'ธรรมชาติ',g:['#166534','#22c55e','#65a30d','#0d9488','#4ade80','#84cc16'],o:['#c2410c','#a16207','#d97706','#92400e','#ea580c','#eab308']},
+ {n:'ม่วง-ชมพู',g:['#6d28d9','#8b5cf6','#a78bfa','#7c3aed','#5b21b6','#c4b5fd'],o:['#be185d','#ec4899','#f472b6','#db2777','#9d174d','#f9a8d4']},
+ {n:'ทะเล-ปะการัง',g:['#0f766e','#14b8a6','#2dd4bf','#0891b2','#155e75','#67e8f9'],o:['#e11d48','#fb7185','#f43f5e','#fda4af','#9f1239','#ff8a65']},
+ {n:'โมโนโทน',g:['#0f172a','#334155','#475569','#64748b','#1e293b','#94a3b8'],o:['#78350f','#92400e','#a8a29e','#57534e','#b45309','#d6d3d1']}
+];
+let sty=0,pal=0;
+const $=id=>document.getElementById(id);
+
+function addRow(side,name='',n=''){
+ const r=document.createElement('div');r.className='row';
+ r.innerHTML='<input type="text" placeholder="ชื่อพรรค"><input type="number" min="0" placeholder="จำนวน"><button class="del" title="ลบแถว">✕</button>';
+ r.children[0].value=name;r.children[1].value=n;
+ r.children[2].onclick=()=>{if($(side).children.length>1)r.remove();else{r.children[0].value='';r.children[1].value='';}};
+ $(side).appendChild(r);
+}
+document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>addRow(b.dataset.add));
+
+function buildPills(){
+ $('styles').innerHTML='';STYLES.forEach((s,i)=>{const b=document.createElement('button');b.textContent=(i+1)+'. '+s;b.className=i===sty?'on':'';b.onclick=()=>{sty=i;buildPills();if(ready)render()};$('styles').appendChild(b)});
+ $('pals').innerHTML='';PALS.forEach((p,i)=>{const b=document.createElement('button');b.innerHTML='<span class="sw">'+[p.g[0],p.g[1],p.o[0],p.o[1]].map(c=>'<i style="background:'+c+'"></i>').join('')+'</span>'+p.n;b.className=i===pal?'on':'';b.onclick=()=>{pal=i;buildPills();if(ready)render()};$('pals').appendChild(b)});
+}
+function initRows(){$('gov').innerHTML='';$('opp').innerHTML='';addRow('gov');addRow('gov');addRow('opp');addRow('opp');}
+
+function shade(hex,k){ // mix with white
+ const n=parseInt(hex.slice(1),16),r=n>>16,g=n>>8&255,b=n&255,m=v=>Math.round(v+(255-v)*k);
+ return 'rgb('+m(r)+','+m(g)+','+m(b)+')';
+}
+function collect(side,colors){
+ const out=[];
+ $(side).querySelectorAll('.row').forEach((r,i)=>{
+  const n=Math.floor(Number(r.children[1].value));
+  if(n>0){const idx=out.length;out.push({name:r.children[0].value.trim()||('พรรค '+(idx+1)),n,color:idx<colors.length?colors[idx]:shade(colors[idx%colors.length],0.25+0.1*Math.floor(idx/colors.length))});}
+ });
+ return out;
+}
+const sum=a=>a.reduce((s,p)=>s+p.n,0);
+const pct=(n,t)=>(t?n/t*100:0).toFixed(1)+'%';
+const F='Sarabun, "Noto Sans Thai", sans-serif';
+
+/* ---------- chart drawers (local coords, panel width 700) ---------- */
+function hemicycle(c,P,cx,by,R){
+ const n=sum(P);let rows=Math.max(1,Math.min(14,Math.round(Math.sqrt(n/2.2))));
+ const r0=rows>1?R*0.4:R,step=rows>1?(R-r0)/(rows-1):0;
+ const radii=[];for(let i=0;i<rows;i++)radii.push(r0+step*i);
+ const tr=radii.reduce((a,b)=>a+b,0),cnt=radii.map(r=>Math.max(1,Math.round(n*r/tr)));
+ let diff=n-cnt.reduce((a,b)=>a+b,0),k=rows-1;while(diff!==0){cnt[k]+=diff>0?1:-1;diff+=diff>0?-1:1;k=(k-1+rows)%rows;}
+ let dot=Infinity;radii.forEach((r,i)=>{dot=Math.min(dot,Math.PI*r/Math.max(cnt[i],1))});
+ dot=Math.min(dot,step||dot)*0.42;
+ const seats=[];radii.forEach((r,i)=>{for(let j=0;j<cnt[i];j++){const a=cnt[i]===1?Math.PI/2:Math.PI*(1-j/(cnt[i]-1));seats.push({a,r});}});
+ seats.sort((x,y)=>y.a-x.a);
+ let si=0;P.forEach(p=>{c.fillStyle=p.color;for(let j=0;j<p.n&&si<seats.length;j++,si++){const s=seats[si];c.beginPath();c.arc(cx+s.r*Math.cos(s.a),by-s.r*Math.sin(s.a),dot,0,7);c.fill();}});
+ return by;
+}
+function arcs(c,P,cx,cy,R,half,inner){
+ const t=sum(P),s0=half?Math.PI:-Math.PI/2,span=half?Math.PI:Math.PI*2;let a=s0;
+ P.forEach(p=>{const d=p.n/t*span;c.beginPath();c.arc(cx,cy,R,a,a+d);if(inner){c.arc(cx,cy,R*inner,a+d,a,true);}else c.lineTo(cx,cy);c.closePath();c.fillStyle=p.color;c.fill();c.strokeStyle='#fff';c.lineWidth=2;c.stroke();a+=d;});
+}
+function bars(c,P,x0,y0,w,h,mx){
+ const rh=Math.min(44,h/P.length),bh=rh*0.68;
+ P.forEach((p,i)=>{const y=y0+i*rh,bw=(w-170)*p.n/mx;
+  c.fillStyle=p.color;c.fillRect(x0+110,y,Math.max(bw,2),bh);
+  c.fillStyle='#222';c.font='600 16px '+F;c.textAlign='right';c.textBaseline='middle';c.fillText(fit(c,p.name,100),x0+100,y+bh/2);
+  c.textAlign='left';c.fillText(p.n,x0+118+bw,y+bh/2);});
+}
+function waffle(c,P,x0,y0,w,h){
+ const n=sum(P);let cols=Math.ceil(Math.sqrt(n*w/h)),rows=Math.ceil(n/cols);
+ const cs=Math.min(w/cols,h/rows),ox=x0+(w-cs*cols)/2,oy=y0+(h-cs*rows)/2;let i=0;
+ P.forEach(p=>{c.fillStyle=p.color;for(let j=0;j<p.n;j++,i++){c.fillRect(ox+(i%cols)*cs+1,oy+Math.floor(i/cols)*cs+1,cs-2,cs-2);}});
+}
+function fit(c,s,w){if(c.measureText(s).width<=w)return s;while(s.length>1&&c.measureText(s+'…').width>w)s=s.slice(0,-1);return s+'…';}
+
+function side(c,P,x,label,total,all,mx,key){
+ c.save();c.translate(x,0);
+ const pc=PALS[pal][key==='g'?'g':'o'][0];
+ c.textAlign='center';c.textBaseline='alphabetic';
+ c.fillStyle=pc;c.font='700 30px '+F;c.fillText(label,350,150);
+ c.fillStyle='#444';c.font='400 20px '+F;
+ c.fillText(total?total+' ที่นั่ง ('+pct(total,all)+' ของสภา)':'ไม่มีข้อมูล',350,180);
+ if(total){
+  const top=210;
+  if(sty===0)hemicycle(c,P,350,top+310,300);
+  else if(sty===1){arcs(c,P,350,top+310,300,true,0.55);c.fillStyle='#222';c.textAlign='center';c.font='700 44px '+F;c.fillText(total,350,top+300);}
+  else if(sty===2)arcs(c,P,350,top+160,160,false,0);
+  else if(sty===3)bars(c,P,30,top,640,320,mx);
+  else waffle(c,P,50,top,600,320);
+  // legend
+  let y=top+370;c.textBaseline='middle';
+  P.forEach(p=>{
+   c.fillStyle=p.color;c.fillRect(60,y-10,20,20);
+   c.fillStyle='#222';c.font='400 19px '+F;c.textAlign='left';c.fillText(fit(c,p.name,340),92,y);
+   c.textAlign='right';c.fillText(p.n+' ที่นั่ง · '+pct(p.n,all),650,y);y+=34;
+  });
+ }
+ c.restore();
+}
+
+let ready=false,lastCanvas=null;
+async function render(){
+ const G=collect('gov',PALS[pal].g),O=collect('opp',PALS[pal].o),tg=sum(G),to=sum(O),all=tg+to;
+ if(!all){alert('กรุณากรอกชื่อพรรคและจำนวนที่นั่งอย่างน้อย 1 พรรค');return;}
+ try{await document.fonts.load('700 20px Sarabun');await document.fonts.load('400 20px Sarabun');}catch(e){}
+ const title=$('title').value.trim(),W=1400,top=title?90:30;
+ const legendRows=Math.max(G.length,O.length),H=210+370+legendRows*34+50;
+ const cv=$('cv'),dpr=2;cv.width=W*dpr;cv.height=H*dpr;
+ const c=cv.getContext('2d');c.scale(dpr,dpr);
+ c.fillStyle='#fff';c.fillRect(0,0,W,H);
+ if(title){c.fillStyle='#111';c.font='700 42px '+F;c.textAlign='center';c.textBaseline='alphabetic';c.fillText(title,W/2,70);}
+ c.save();c.translate(0,title?0:-60);
+ const mx=Math.max(...G.map(p=>p.n),...O.map(p=>p.n));
+ side(c,G,0,'ฝ่ายรัฐบาล',tg,all,mx,'g');
+ side(c,O,700,'ฝ่ายค้าน',to,all,mx,'o');
+ c.strokeStyle='#ddd';c.lineWidth=2;c.beginPath();c.moveTo(700,130);c.lineTo(700,H+60-40);c.stroke();
+ c.restore();
+ c.fillStyle='#888';c.font='400 16px '+F;c.textAlign='right';c.fillText('รวมทั้งสภา '+all+' ที่นั่ง',W-30,H-14);
+ $('out').style.display='block';ready=true;lastCanvas=cv;
+ analyze(G,O,tg,to,all);
+}
+function enp(P,t){return 1/P.reduce((s,p)=>s+Math.pow(p.n/t,2),0)}
+function analyze(G,O,tg,to,all){
+ const need=Math.floor(all/2)+1,all2=[...G.map(p=>({...p,s:'รัฐบาล'})),...O.map(p=>({...p,s:'ฝ่ายค้าน'}))].sort((a,b)=>b.n-a.n);
+ const L=[];
+ L.push('สภามีที่นั่งรวม <b>'+all+'</b> ที่นั่ง ต้องมีเสียงอย่างน้อย <b>'+need+'</b> ที่นั่งจึงจะได้เสียงข้างมาก');
+ if(tg>=need)L.push('ฝ่ายรัฐบาลมี <b>'+tg+'</b> ที่นั่ง ('+pct(tg,all)+') <b>ได้เสียงข้างมาก</b> เกินกึ่งหนึ่งอยู่ '+(tg-need+1)+' เสียง ส่วนฝ่ายค้านมี '+to+' ที่นั่ง ('+pct(to,all)+') ห่างกัน '+(tg-to)+' ที่นั่ง');
+ else if(tg===to)L.push('ทั้งสองฝ่ายมีที่นั่ง <b>เท่ากัน</b> ที่ '+tg+' ที่นั่ง ('+pct(tg,all)+') จึงอยู่ในภาวะเสมอ');
+ else L.push('ฝ่ายรัฐบาลมี <b>'+tg+'</b> ที่นั่ง ('+pct(tg,all)+') ยัง<b>ไม่ถึงเสียงข้างมาก</b> ขาดอีก '+(need-tg)+' เสียง'+(to>tg?' และน้อยกว่าฝ่ายค้านซึ่งมี '+to+' ที่นั่ง ('+pct(to,all)+')':' ขณะที่ฝ่ายค้านมี '+to+' ที่นั่ง ('+pct(to,all)+')'));
+ if(G.length){const g=G.slice().sort((a,b)=>b.n-a.n)[0];L.push('ฝ่ายรัฐบาลประกอบด้วย <b>'+G.length+'</b> พรรค พรรคใหญ่สุดคือ <b>'+g.name+'</b> ('+g.n+' ที่นั่ง คิดเป็น '+pct(g.n,tg)+' ของฝ่ายรัฐบาล)'+(G.length>1?' จำนวนพรรคที่มีอิทธิพลจริง (ENP) ประมาณ '+enp(G,tg).toFixed(2)+' พรรค':''));}
+ if(O.length){const o=O.slice().sort((a,b)=>b.n-a.n)[0];L.push('ฝ่ายค้านประกอบด้วย <b>'+O.length+'</b> พรรค พรรคใหญ่สุดคือ <b>'+o.name+'</b> ('+o.n+' ที่นั่ง คิดเป็น '+pct(o.n,to)+' ของฝ่ายค้าน)'+(O.length>1?' ENP ประมาณ '+enp(O,to).toFixed(2)+' พรรค':''));}
+ const t=all2[0];L.push('พรรคที่มีที่นั่งมากที่สุดในสภาคือ <b>'+t.name+'</b> ('+t.n+' ที่นั่ง, '+pct(t.n,all)+') อยู่ฝั่ง'+t.s+(t.n>=need?' และมีเสียงเกินกึ่งหนึ่งด้วยตนเอง':' แต่ยังไม่ถึงเสียงข้างมากเพียงพรรคเดียว'));
+ L.push('ภาพรวมทั้งสภามีพรรคการเมืองรวม '+all2.length+' พรรค ค่า ENP รวมประมาณ '+enp(all2,all).toFixed(2)+' พรรค ยิ่งค่าสูงยิ่งสะท้อนการกระจายตัวของที่นั่ง');
+ $('ana').innerHTML=L.map(x=>'<p>'+x+'</p>').join('');
+}
+$('go').onclick=render;
+$('rs').onclick=()=>{if(!confirm('ต้องการรีเซ็ตข้อมูลทั้งหมดหรือไม่?'))return;$('title').value='';initRows();sty=0;pal=0;buildPills();$('out').style.display='none';ready=false;};
+$('dl').onclick=async()=>{
+ if(!ready)await render();if(!ready)return;
+ const blob=await new Promise(r=>lastCanvas.toBlob(r,'image/png'));
+ const name='parliament-diagram.png';
+ let d=null;try{d=await claude.use('downloads')}catch(e){}
+ if(d){try{await d.save({filename:name,data:blob})}catch(e){}}
+ else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();}
+};
+buildPills();initRows();
+</script>
+</body>
+</html>
